@@ -491,8 +491,9 @@ class InpaintGenerator(BaseNetwork):
 
 
 
-    def forward(self, images_masked):
+    def forward(self, images_masked,masks):
         x = images_masked
+        #y = masks
         x = self.encoder(x)
         x = self.middle1(x)
         b, c, h, w = x.shape
