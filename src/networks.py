@@ -496,6 +496,7 @@ class InpaintGenerator(BaseNetwork):
         #y = masks
         x = self.encoder(x)
         x = self.middle1(x)
+        print(x.shape)
         b, c, h, w = x.shape
         tgt = x.reshape(b, c, h * w).permute(2, 0, 1).contiguous()
         # # #print(tgt.shape) [1024,12,512]
@@ -504,6 +505,7 @@ class InpaintGenerator(BaseNetwork):
         attn_out, _ = self.attn(tgt, mem, mem)
         attn_out = attn_out.permute(1, 2, 0).reshape(x.shape)
         x = x + attn_out
+        print(x.shape)
         x = self.middle2(x)
         x = self.decoder(x)
         x = (torch.tanh(x) + 1) / 2
