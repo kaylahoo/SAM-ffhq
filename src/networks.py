@@ -14,6 +14,7 @@ from image_synthesis.distributed.distributed import all_reduce, get_world_size
 from image_synthesis.modeling.modules.edge_connect.losses import EdgeConnectLoss
 from image_synthesis.modeling.utils.position_encoding import build_position_encoding
 from src.stageone import InpaintGenerator1
+from src.CA import CoordAtt
 
 # from timm.models.layers import DropPath
 
@@ -511,7 +512,7 @@ class InpaintGenerator(BaseNetwork):
 #         x = (torch.tanh(x) + 1) / 2
 #         #x = torch.sigmoid(x) #edge
 #         return x #, emb_loss
-    def __init__(self, image_in_channels=4, out_channels=4, init_weights=True):
+    def __init__(self, image_in_channels=4, out_channels=4, init_weights=True,use_spectral_norm=True):
         super(InpaintGenerator, self).__init__()
 
         self.freeze_ec_bn = False
@@ -536,6 +537,36 @@ class InpaintGenerator(BaseNetwork):
         self.dc_texture_2 = PConvBNActiv(128 + 64, 64, activ='leaky')
         self.dc_texture_1 = PConvBNActiv(64 + out_channels, 64, activ='leaky')
 
+        self.encoder = nn.Sequential(
+            nn.ReflectionPad2d(3),
+            spectral_norm(nn.Conv2d(in_channels=3, out_channels=64, kernel_size=7, padding=0,dilation=1), use_spectral_norm),
+            nn.InstanceNorm2d(64, track_running_stats=False),
+            nn.ReLU(True),
+
+            spectral_norm(nn.Conv2d(in_channels=64, out_channels=128, kernel_size=4, stride=2, padding=1,dilation=2),
+                          use_spectral_norm),
+            nn.InstanceNorm2d(128, track_running_stats=False),
+            nn.ReLU(True),
+
+            spectral_norm(nn.Conv2d(in_channels=128, out_channels=256, kernel_size=4, stride=2, padding=1,dilation=2),
+                          use_spectral_norm),
+            nn.InstanceNorm2d(256, track_running_stats=False),
+            nn.ReLU(True),
+
+            spectral_norm(nn.Conv2d(in_channels=256, out_channels=512, kernel_size=4, stride=2, padding=1,dilation=2),
+                          use_spectral_norm),
+            nn.InstanceNorm2d(512, track_running_stats=False),
+            nn.ReLU(True)
+
+        )
+        blocks = []
+        for _ in range(8):
+            block = ResnetBlock(512, 2, use_spectral_norm=use_spectral_norm)
+            blocks.append(block)
+
+        self.middle = nn.Sequential(*blocks)
+
+
         self.fusion_layer1 = nn.Sequential(
             nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
             nn.LeakyReLU(negative_slope=0.2)
@@ -548,6 +579,8 @@ class InpaintGenerator(BaseNetwork):
             nn.Conv2d(64, 3, kernel_size=1),
             nn.Tanh()
         )
+
+
 
         if init_weights:
             self.init_weights()
@@ -629,6 +662,9 @@ class InpaintGenerator(BaseNetwork):
         #     x = (torch.tanh(x) + 1) / 2
         #
         #     return x
+        x = self.encoder(images_masked)
+        x = self.middle(x)
+        print(x.shape)
 
         ec_textures = {}
         ec_structures = {}
@@ -661,6 +697,7 @@ class InpaintGenerator(BaseNetwork):
         # print(attn_out.shape) [1024,2,512] --> permute(1, 2, 0) --> [2,512,1024]
         attn_out = attn_out.permute(1, 2, 0).reshape(dc_texture_512.shape)
         attn_out_256 = self.down_dim(attn_out)
+
         ec_textures['ec_t_3'] = ec_textures['ec_t_3'] + attn_out_256
         # print('t33', ec_textures['ec_t_3'].shape)#[2,256,32,32]
         # print('t33', ec_textures['ec_t_masks_3'].shape)#[2,256,32,32]
@@ -681,6 +718,8 @@ class InpaintGenerator(BaseNetwork):
         # print('t7', ec_textures['ec_t_7'].shape)#[2,512,2,2]
         # print('t7m', ec_textures['ec_t_masks_7'].shape)#[2,512,2,2]
         dc_texture, dc_tecture_mask = ec_textures['ec_t_7'], ec_textures['ec_t_masks_7']
+
+
 
         for _ in range(7, 0, -1):
 
@@ -706,6 +745,12 @@ class InpaintGenerator(BaseNetwork):
         output4 = self.out_layer(output3)
 
         return output4
+
+    def spectral_norm(module, mode=True):
+        if mode:
+            return nn.utils.spectral_norm(module)
+
+        return module
 
 def value_scheduler(init_value, dest_value, step, step_range, total_steps, scheduler_type='cosine'):
     assert scheduler_type in ['cosine', 'step'], 'scheduler {} not implemented!'.format(scheduler_type)
