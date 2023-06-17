@@ -539,21 +539,21 @@ class InpaintGenerator(BaseNetwork):
 
         self.encoder = nn.Sequential(
             nn.ReflectionPad2d(3),
-            spectral_norm(nn.Conv2d(in_channels=4, out_channels=64, kernel_size=7, padding=0,dilation=1), use_spectral_norm),
+            spectral_norm(nn.Conv2d(in_channels=4, out_channels=64, kernel_size=7, stride=2,padding=3,dilation=1), use_spectral_norm),
             nn.InstanceNorm2d(64, track_running_stats=False),
             nn.ReLU(True),
 
-            spectral_norm(nn.Conv2d(in_channels=64, out_channels=128, kernel_size=4, stride=2, padding=1,dilation=2),
+            spectral_norm(nn.Conv2d(in_channels=64, out_channels=128, kernel_size=5, stride=2, padding=2,dilation=2),
                           use_spectral_norm),
             nn.InstanceNorm2d(128, track_running_stats=False),
             nn.ReLU(True),
 
-            spectral_norm(nn.Conv2d(in_channels=128, out_channels=256, kernel_size=4, stride=2, padding=1,dilation=2),
+            spectral_norm(nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=1, padding=1,dilation=2),
                           use_spectral_norm),
             nn.InstanceNorm2d(256, track_running_stats=False),
             nn.ReLU(True),
 
-            spectral_norm(nn.Conv2d(in_channels=256, out_channels=512, kernel_size=4, stride=2, padding=1,dilation=2),
+            spectral_norm(nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=1, padding=1,dilation=2),
                           use_spectral_norm),
             nn.InstanceNorm2d(512, track_running_stats=False),
             nn.ReLU(True)
