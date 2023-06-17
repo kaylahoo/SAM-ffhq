@@ -663,6 +663,7 @@ class InpaintGenerator(BaseNetwork):
         #
         #     return x
         x = self.encoder(images_masked)
+        print(x.shape)
         x = self.middle(x)
         print(x.shape)
 
