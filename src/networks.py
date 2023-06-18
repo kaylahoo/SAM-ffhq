@@ -559,12 +559,12 @@ class InpaintGenerator(BaseNetwork):
             nn.InstanceNorm2d(512, track_running_stats=False),
             nn.ReLU(True),
 
-            spectral_norm(nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=2, padding=2, dilation=2),
+            spectral_norm(nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, stride=2, padding=2, dilation=2),
                       use_spectral_norm),
             nn.InstanceNorm2d(512, track_running_stats=False),
             nn.ReLU(True),
 
-            spectral_norm(nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=2, padding=2, dilation=2),
+            spectral_norm(nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, stride=2, padding=2, dilation=2),
                           use_spectral_norm),
             nn.InstanceNorm2d(512, track_running_stats=False),
             nn.ReLU(True)
@@ -675,7 +675,7 @@ class InpaintGenerator(BaseNetwork):
         #     return x
         x = self.encoder_firstthree(images_masked)
         print(x.shape)
-        ca_x = CoordAtt(x)
+        ca_x = CoordAtt(x,512)
         x = self.encoder_lastthree(ca_x)
         x = self.middle(x)
         print(x.shape)
