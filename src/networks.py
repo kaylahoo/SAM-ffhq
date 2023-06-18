@@ -731,6 +731,9 @@ class InpaintGenerator(BaseNetwork):
         # print('t7m', ec_textures['ec_t_masks_7'].shape)#[2,512,2,2]
         dc_texture, dc_tecture_mask = ec_textures['ec_t_7'], ec_textures['ec_t_masks_7']
 
+        print(dc_texture.shape)
+        print(x.shape)
+
         dc_texture= x + dc_texture
 
         for _ in range(7, 0, -1):
