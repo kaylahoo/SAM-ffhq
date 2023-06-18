@@ -537,7 +537,7 @@ class InpaintGenerator(BaseNetwork):
         self.dc_texture_2 = PConvBNActiv(128 + 64, 64, activ='leaky')
         self.dc_texture_1 = PConvBNActiv(64 + out_channels, 64, activ='leaky')
 
-        self.encoder = nn.Sequential(
+        self.encoder_firstthree = nn.Sequential(
             # nn.ReflectionPad2d(3),
             spectral_norm(nn.Conv2d(in_channels=4, out_channels=64, kernel_size=7, stride=2,padding=3,dilation=1), use_spectral_norm),
             nn.InstanceNorm2d(64, track_running_stats=False),
@@ -551,9 +551,20 @@ class InpaintGenerator(BaseNetwork):
             spectral_norm(nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=2, padding=2,dilation=2),
                           use_spectral_norm),
             nn.InstanceNorm2d(256, track_running_stats=False),
+            nn.ReLU(True)
+        )
+        self.encoder_lastthree = nn.Sequential(
+            spectral_norm(nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=2, padding=2,dilation=2),
+                          use_spectral_norm),
+            nn.InstanceNorm2d(512, track_running_stats=False),
             nn.ReLU(True),
 
-            spectral_norm(nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=2, padding=2,dilation=2),
+            spectral_norm(nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=2, padding=2, dilation=2),
+                      use_spectral_norm),
+            nn.InstanceNorm2d(512, track_running_stats=False),
+            nn.ReLU(True),
+
+            spectral_norm(nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=2, padding=2, dilation=2),
                           use_spectral_norm),
             nn.InstanceNorm2d(512, track_running_stats=False),
             nn.ReLU(True)
@@ -662,8 +673,10 @@ class InpaintGenerator(BaseNetwork):
         #     x = (torch.tanh(x) + 1) / 2
         #
         #     return x
-        x = self.encoder(images_masked)
+        x = self.encoder_firstthree(images_masked)
         print(x.shape)
+        ca_x = CoordAtt(x)
+        x = self.encoder_lastthree(ca_x)
         x = self.middle(x)
         print(x.shape)
 
