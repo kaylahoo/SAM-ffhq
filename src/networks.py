@@ -576,7 +576,7 @@ class InpaintGenerator(BaseNetwork):
             blocks.append(block)
 
         self.middle = nn.Sequential(*blocks)
-
+        self.ca_x = CoordAtt(256,256)
 
         self.fusion_layer1 = nn.Sequential(
             nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
@@ -675,8 +675,8 @@ class InpaintGenerator(BaseNetwork):
         #     return x
         x = self.encoder_firstthree(images_masked)
         print(x.shape)
-        ca_x = CoordAtt(x,512)
-        x = self.encoder_lastthree(ca_x)
+        x = self.ca_x(x)
+        x = self.encoder_lastthree(x)
         x = self.middle(x)
         print(x.shape)
 
