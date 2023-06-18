@@ -543,7 +543,7 @@ class InpaintGenerator(BaseNetwork):
             nn.InstanceNorm2d(64, track_running_stats=False),
             nn.ReLU(True),
 
-            spectral_norm(nn.Conv2d(in_channels=64, out_channels=128, kernel_size=5, stride=2, padding=3,dilation=2),
+            spectral_norm(nn.Conv2d(in_channels=64, out_channels=128, kernel_size=5, stride=2, padding=8,dilation=2),
                           use_spectral_norm),
             nn.InstanceNorm2d(128, track_running_stats=False),
             nn.ReLU(True),
