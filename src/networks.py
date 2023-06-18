@@ -681,7 +681,7 @@ class InpaintGenerator(BaseNetwork):
         x = self.encoder_firstthree(images_masked)
         x = self.ca_x(x)
         x = self.encoder_lastthree(x)
-        x = self.middle(x)
+        #x = self.middle(x)
 
         ec_textures = {}
         ec_structures = {}
