@@ -674,11 +674,9 @@ class InpaintGenerator(BaseNetwork):
         #
         #     return x
         x = self.encoder_firstthree(images_masked)
-        print(x.shape)
         x = self.ca_x(x)
         x = self.encoder_lastthree(x)
         x = self.middle(x)
-        print(x.shape)
 
         ec_textures = {}
         ec_structures = {}
@@ -733,7 +731,7 @@ class InpaintGenerator(BaseNetwork):
         # print('t7m', ec_textures['ec_t_masks_7'].shape)#[2,512,2,2]
         dc_texture, dc_tecture_mask = ec_textures['ec_t_7'], ec_textures['ec_t_masks_7']
 
-
+        dc_texture= x + dc_texture
 
         for _ in range(7, 0, -1):
 
