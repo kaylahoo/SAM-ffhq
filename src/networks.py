@@ -15,6 +15,7 @@ from image_synthesis.modeling.modules.edge_connect.losses import EdgeConnectLoss
 from image_synthesis.modeling.utils.position_encoding import build_position_encoding
 from src.stageone import InpaintGenerator1
 from src.CA import CoordAtt
+from timm.models.layers import DropPath
 
 # from timm.models.layers import DropPath
 
@@ -512,7 +513,7 @@ class InpaintGenerator(BaseNetwork):
 #         x = (torch.tanh(x) + 1) / 2
 #         #x = torch.sigmoid(x) #edge
 #         return x #, emb_loss
-    def __init__(self, image_in_channels=4, out_channels=4, init_weights=True,use_spectral_norm=True):
+    def __init__(self, image_in_channels=4, out_channels=4, init_weights=True,use_spectral_norm=True,mlp_dwconv=False,mlp_ratio=4,drop_path=0):
         super(InpaintGenerator, self).__init__()
 
         self.freeze_ec_bn = False
@@ -595,6 +596,12 @@ class InpaintGenerator(BaseNetwork):
             nn.Conv2d(64, 3, kernel_size=1),
             nn.Tanh()
         )
+        self.mlp = nn.Sequential(nn.Linear(256, int(4 * 256)),
+                                 DWConv(int(4 * 256)) if mlp_dwconv else nn.Identity(),
+                                 nn.GELU(),
+                                 nn.Linear(int(4 * 256), 256)
+                                 )
+        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
 
 
@@ -680,6 +687,8 @@ class InpaintGenerator(BaseNetwork):
         #     return x
         x = self.encoder_firstthree(images_masked)
         x = self.ca_x(x)
+        x = x + self.drop_path(self.mlp(x))  # (N, H, W, C)
+        x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
         x = self.encoder_lastthree(x)
         #x = self.middle(x)
 
@@ -769,7 +778,6 @@ class InpaintGenerator(BaseNetwork):
             return nn.utils.spectral_norm(module)
 
         return module
-
 def value_scheduler(init_value, dest_value, step, step_range, total_steps, scheduler_type='cosine'):
     assert scheduler_type in ['cosine', 'step'], 'scheduler {} not implemented!'.format(scheduler_type)
 
@@ -826,6 +834,38 @@ def calculate_kl_loss(q, p, lamb=0.1):
     loss = torch.sum(p * torch.log((p / q)))
     return loss * lamb
 
+class Mlp(nn.Module):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
+        super().__init__()
+        out_features = out_features or in_features
+        hidden_features = hidden_features or in_features
+        self.fc1 = nn.Linear(in_features, hidden_features)
+        self.act = act_layer()
+        self.fc2 = nn.Linear(hidden_features, out_features)
+        self.drop = nn.Dropout(drop)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.act(x)
+        x = self.drop(x)
+        x = self.fc2(x)
+        x = self.drop(x)
+        return x
+
+class DWConv(nn.Module):
+    def __init__(self, dim=768):
+        super(DWConv, self).__init__()
+        self.dwconv = nn.Conv2d(dim, dim, 3, 1, 1, bias=True, groups=dim)
+
+    def forward(self, x):
+        """
+        x: NHWC tensor
+        """
+        x = x.permute(0, 3, 1, 2) #NCHW
+        x = self.dwconv(x)
+        x = x.permute(0, 2, 3, 1) #NHWC
+
+        return x
 
 class VectorQuantizer(nn.Module):
     """
